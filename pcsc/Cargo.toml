@@ -15,4 +15,5 @@ edition = "2021"
 
 [dependencies]
 bitflags = "2"
+widestring = "1.0"
 pcsc-sys = { version = "1.3.0", path = "../pcsc-sys" }

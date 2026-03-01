@@ -101,10 +101,8 @@
 #![allow(deprecated)]
 #![allow(clippy::bad_bit_mask)]
 
-use std::ffi::{CStr, CString};
 use std::mem::{forget, transmute};
 use std::ops::Deref;
-use std::os::raw::c_char;
 use std::ptr::{null, null_mut};
 use std::sync::Arc;
 
@@ -112,6 +110,7 @@ use bitflags::bitflags;
 pub use pcsc_sys as ffi;
 
 use ffi::{DWORD, LONG};
+use widestring::{U16CStr, U16CString, u16cstr};
 
 // We use these instead of std::mem::uninitialized -- variables which are
 // set to this are always overridden and the dummy values are never exposed.
@@ -142,13 +141,6 @@ bitflags! {
     }
 }
 
-// Backward compat with bitflags 1.
-impl State {
-    #[deprecated = "use the safe `from_bits_retain` method instead"]
-    pub unsafe fn from_bits_unchecked(bits: DWORD) -> Self {
-        Self::from_bits_retain(bits)
-    }
-}
 
 bitflags! {
     /// A mask of the status of a card in a card reader.
@@ -209,21 +201,15 @@ impl Status {
         #[cfg(not(target_os = "windows"))]
         Status::from_bits_truncate(raw_status)
     }
-
-    // Backward compat with bitflags 1.
-    #[deprecated = "use the safe `from_bits_retain` method instead"]
-    pub unsafe fn from_bits_unchecked(bits: DWORD) -> Self {
-        Self::from_bits_retain(bits)
-    }
 }
 
 /// How a reader connection is shared.
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ShareMode {
-    Exclusive = ffi::SCARD_SHARE_EXCLUSIVE as u32,
-    Shared = ffi::SCARD_SHARE_SHARED as u32,
-    Direct = ffi::SCARD_SHARE_DIRECT as u32,
+    Exclusive = ffi::SCARD_SHARE_EXCLUSIVE,
+    Shared = ffi::SCARD_SHARE_SHARED,
+    Direct = ffi::SCARD_SHARE_DIRECT,
 }
 
 impl ShareMode {
@@ -236,9 +222,9 @@ impl ShareMode {
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Protocol {
-    T0 = ffi::SCARD_PROTOCOL_T0 as u32,
-    T1 = ffi::SCARD_PROTOCOL_T1 as u32,
-    RAW = ffi::SCARD_PROTOCOL_RAW as u32,
+    T0 = ffi::SCARD_PROTOCOL_T0,
+    T1 = ffi::SCARD_PROTOCOL_T1,
+    RAW = ffi::SCARD_PROTOCOL_RAW,
 }
 
 impl Protocol {
@@ -268,22 +254,14 @@ bitflags! {
     }
 }
 
-// Backward compat with bitflags 1.
-impl Protocols {
-    #[deprecated = "use the safe `from_bits_retain` method instead"]
-    pub unsafe fn from_bits_unchecked(bits: DWORD) -> Self {
-        Self::from_bits_retain(bits)
-    }
-}
-
 /// Disposition method when disconnecting from a card reader.
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Disposition {
-    LeaveCard = ffi::SCARD_LEAVE_CARD as u32,
-    ResetCard = ffi::SCARD_RESET_CARD as u32,
-    UnpowerCard = ffi::SCARD_UNPOWER_CARD as u32,
-    EjectCard = ffi::SCARD_EJECT_CARD as u32,
+    LeaveCard = ffi::SCARD_LEAVE_CARD,
+    ResetCard = ffi::SCARD_RESET_CARD,
+    UnpowerCard = ffi::SCARD_UNPOWER_CARD,
+    EjectCard = ffi::SCARD_EJECT_CARD,
 }
 
 impl Disposition {
@@ -499,10 +477,10 @@ macro_rules! try_pcsc {
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Scope {
-    User = ffi::SCARD_SCOPE_USER as u32,
-    Terminal = ffi::SCARD_SCOPE_TERMINAL as u32,
-    System = ffi::SCARD_SCOPE_SYSTEM as u32,
-    Global = ffi::SCARD_SCOPE_GLOBAL as u32,
+    User = ffi::SCARD_SCOPE_USER,
+    Terminal = ffi::SCARD_SCOPE_TERMINAL,
+    System = ffi::SCARD_SCOPE_SYSTEM,
+    Global = ffi::SCARD_SCOPE_GLOBAL,
 }
 
 impl Scope {
@@ -515,68 +493,68 @@ impl Scope {
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AttributeClass {
-    VendorInfo = ffi::SCARD_CLASS_VENDOR_INFO as u32,
-    Communications = ffi::SCARD_CLASS_COMMUNICATIONS as u32,
-    Protocol = ffi::SCARD_CLASS_PROTOCOL as u32,
-    PowerMgmt = ffi::SCARD_CLASS_POWER_MGMT as u32,
-    Security = ffi::SCARD_CLASS_SECURITY as u32,
-    Mechanical = ffi::SCARD_CLASS_MECHANICAL as u32,
-    VendorDefined = ffi::SCARD_CLASS_VENDOR_DEFINED as u32,
-    IfdProtocol = ffi::SCARD_CLASS_IFD_PROTOCOL as u32,
-    IccState = ffi::SCARD_CLASS_ICC_STATE as u32,
-    System = ffi::SCARD_CLASS_SYSTEM as u32,
+    VendorInfo = ffi::SCARD_CLASS_VENDOR_INFO,
+    Communications = ffi::SCARD_CLASS_COMMUNICATIONS,
+    Protocol = ffi::SCARD_CLASS_PROTOCOL,
+    PowerMgmt = ffi::SCARD_CLASS_POWER_MGMT,
+    Security = ffi::SCARD_CLASS_SECURITY,
+    Mechanical = ffi::SCARD_CLASS_MECHANICAL,
+    VendorDefined = ffi::SCARD_CLASS_VENDOR_DEFINED,
+    IfdProtocol = ffi::SCARD_CLASS_IFD_PROTOCOL,
+    IccState = ffi::SCARD_CLASS_ICC_STATE,
+    System = ffi::SCARD_CLASS_SYSTEM,
 }
 
 /// Card reader attribute types.
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Attribute {
-    VendorName = ffi::SCARD_ATTR_VENDOR_NAME as u32,
-    VendorIfdType = ffi::SCARD_ATTR_VENDOR_IFD_TYPE as u32,
-    VendorIfdVersion = ffi::SCARD_ATTR_VENDOR_IFD_VERSION as u32,
-    VendorIfdSerialNo = ffi::SCARD_ATTR_VENDOR_IFD_SERIAL_NO as u32,
-    ChannelId = ffi::SCARD_ATTR_CHANNEL_ID as u32,
-    AsyncProtocolTypes = ffi::SCARD_ATTR_ASYNC_PROTOCOL_TYPES as u32,
-    DefaultClk = ffi::SCARD_ATTR_DEFAULT_CLK as u32,
-    MaxClk = ffi::SCARD_ATTR_MAX_CLK as u32,
-    DefaultDataRate = ffi::SCARD_ATTR_DEFAULT_DATA_RATE as u32,
-    MaxDataRate = ffi::SCARD_ATTR_MAX_DATA_RATE as u32,
-    MaxIfsd = ffi::SCARD_ATTR_MAX_IFSD as u32,
-    SyncProtocolTypes = ffi::SCARD_ATTR_SYNC_PROTOCOL_TYPES as u32,
-    PowerMgmtSupport = ffi::SCARD_ATTR_POWER_MGMT_SUPPORT as u32,
-    UserToCardAuthDevice = ffi::SCARD_ATTR_USER_TO_CARD_AUTH_DEVICE as u32,
-    UserAuthInputDevice = ffi::SCARD_ATTR_USER_AUTH_INPUT_DEVICE as u32,
-    Characteristics = ffi::SCARD_ATTR_CHARACTERISTICS as u32,
+    VendorName = ffi::SCARD_ATTR_VENDOR_NAME,
+    VendorIfdType = ffi::SCARD_ATTR_VENDOR_IFD_TYPE,
+    VendorIfdVersion = ffi::SCARD_ATTR_VENDOR_IFD_VERSION,
+    VendorIfdSerialNo = ffi::SCARD_ATTR_VENDOR_IFD_SERIAL_NO,
+    ChannelId = ffi::SCARD_ATTR_CHANNEL_ID,
+    AsyncProtocolTypes = ffi::SCARD_ATTR_ASYNC_PROTOCOL_TYPES,
+    DefaultClk = ffi::SCARD_ATTR_DEFAULT_CLK,
+    MaxClk = ffi::SCARD_ATTR_MAX_CLK,
+    DefaultDataRate = ffi::SCARD_ATTR_DEFAULT_DATA_RATE,
+    MaxDataRate = ffi::SCARD_ATTR_MAX_DATA_RATE,
+    MaxIfsd = ffi::SCARD_ATTR_MAX_IFSD,
+    SyncProtocolTypes = ffi::SCARD_ATTR_SYNC_PROTOCOL_TYPES,
+    PowerMgmtSupport = ffi::SCARD_ATTR_POWER_MGMT_SUPPORT,
+    UserToCardAuthDevice = ffi::SCARD_ATTR_USER_TO_CARD_AUTH_DEVICE,
+    UserAuthInputDevice = ffi::SCARD_ATTR_USER_AUTH_INPUT_DEVICE,
+    Characteristics = ffi::SCARD_ATTR_CHARACTERISTICS,
 
-    CurrentProtocolType = ffi::SCARD_ATTR_CURRENT_PROTOCOL_TYPE as u32,
-    CurrentClk = ffi::SCARD_ATTR_CURRENT_CLK as u32,
-    CurrentF = ffi::SCARD_ATTR_CURRENT_F as u32,
-    CurrentD = ffi::SCARD_ATTR_CURRENT_D as u32,
-    CurrentN = ffi::SCARD_ATTR_CURRENT_N as u32,
-    CurrentW = ffi::SCARD_ATTR_CURRENT_W as u32,
-    CurrentIfsc = ffi::SCARD_ATTR_CURRENT_IFSC as u32,
-    CurrentIfsd = ffi::SCARD_ATTR_CURRENT_IFSD as u32,
-    CurrentBwt = ffi::SCARD_ATTR_CURRENT_BWT as u32,
-    CurrentCwt = ffi::SCARD_ATTR_CURRENT_CWT as u32,
-    CurrentEbcEncoding = ffi::SCARD_ATTR_CURRENT_EBC_ENCODING as u32,
-    ExtendedBwt = ffi::SCARD_ATTR_EXTENDED_BWT as u32,
+    CurrentProtocolType = ffi::SCARD_ATTR_CURRENT_PROTOCOL_TYPE,
+    CurrentClk = ffi::SCARD_ATTR_CURRENT_CLK,
+    CurrentF = ffi::SCARD_ATTR_CURRENT_F,
+    CurrentD = ffi::SCARD_ATTR_CURRENT_D,
+    CurrentN = ffi::SCARD_ATTR_CURRENT_N,
+    CurrentW = ffi::SCARD_ATTR_CURRENT_W,
+    CurrentIfsc = ffi::SCARD_ATTR_CURRENT_IFSC,
+    CurrentIfsd = ffi::SCARD_ATTR_CURRENT_IFSD,
+    CurrentBwt = ffi::SCARD_ATTR_CURRENT_BWT,
+    CurrentCwt = ffi::SCARD_ATTR_CURRENT_CWT,
+    CurrentEbcEncoding = ffi::SCARD_ATTR_CURRENT_EBC_ENCODING,
+    ExtendedBwt = ffi::SCARD_ATTR_EXTENDED_BWT,
 
-    IccPresence = ffi::SCARD_ATTR_ICC_PRESENCE as u32,
-    IccInterfaceStatus = ffi::SCARD_ATTR_ICC_INTERFACE_STATUS as u32,
-    CurrentIoState = ffi::SCARD_ATTR_CURRENT_IO_STATE as u32,
-    AtrString = ffi::SCARD_ATTR_ATR_STRING as u32,
-    IccTypePerAtr = ffi::SCARD_ATTR_ICC_TYPE_PER_ATR as u32,
+    IccPresence = ffi::SCARD_ATTR_ICC_PRESENCE,
+    IccInterfaceStatus = ffi::SCARD_ATTR_ICC_INTERFACE_STATUS,
+    CurrentIoState = ffi::SCARD_ATTR_CURRENT_IO_STATE,
+    AtrString = ffi::SCARD_ATTR_ATR_STRING,
+    IccTypePerAtr = ffi::SCARD_ATTR_ICC_TYPE_PER_ATR,
 
-    EscReset = ffi::SCARD_ATTR_ESC_RESET as u32,
-    EscCancel = ffi::SCARD_ATTR_ESC_CANCEL as u32,
-    EscAuthrequest = ffi::SCARD_ATTR_ESC_AUTHREQUEST as u32,
-    Maxinput = ffi::SCARD_ATTR_MAXINPUT as u32,
+    EscReset = ffi::SCARD_ATTR_ESC_RESET,
+    EscCancel = ffi::SCARD_ATTR_ESC_CANCEL,
+    EscAuthrequest = ffi::SCARD_ATTR_ESC_AUTHREQUEST,
+    Maxinput = ffi::SCARD_ATTR_MAXINPUT,
 
-    DeviceUnit = ffi::SCARD_ATTR_DEVICE_UNIT as u32,
-    DeviceInUse = ffi::SCARD_ATTR_DEVICE_IN_USE as u32,
-    DeviceFriendlyName = ffi::SCARD_ATTR_DEVICE_FRIENDLY_NAME as u32,
-    DeviceSystemName = ffi::SCARD_ATTR_DEVICE_SYSTEM_NAME as u32,
-    SupressT1IfsRequest = ffi::SCARD_ATTR_SUPRESS_T1_IFS_REQUEST as u32,
+    DeviceUnit = ffi::SCARD_ATTR_DEVICE_UNIT,
+    DeviceInUse = ffi::SCARD_ATTR_DEVICE_IN_USE,
+    DeviceFriendlyName = ffi::SCARD_ATTR_DEVICE_FRIENDLY_NAME,
+    DeviceSystemName = ffi::SCARD_ATTR_DEVICE_SYSTEM_NAME,
+    SupressT1IfsRequest = ffi::SCARD_ATTR_SUPRESS_T1_IFS_REQUEST,
 }
 
 impl Attribute {
@@ -600,9 +578,9 @@ pub const MAX_BUFFER_SIZE_EXTENDED: usize = ffi::MAX_BUFFER_SIZE_EXTENDED;
 /// used as such.
 #[allow(non_snake_case)]
 // We can't have a const &CStr yet, so we simulate it with a function.
-pub fn PNP_NOTIFICATION() -> &'static CStr {
+pub fn PNP_NOTIFICATION() -> &'static U16CStr {
     // The panic can't happen, but we avoid unsafe.
-    CStr::from_bytes_with_nul(b"\\\\?PnP?\\Notification\0").unwrap()
+    u16cstr!(r"\\?PnP?\Notification")
 }
 
 /// Transform a control code in the form expected by the platform.
@@ -682,21 +660,22 @@ pub struct Transaction<'tx> {
 /// buffer.
 #[derive(Clone, Debug)]
 pub struct ReaderNames<'buf> {
-    buf: &'buf [u8],
+    buf: &'buf [u16],
     pos: usize,
 }
 
 impl<'buf> Iterator for ReaderNames<'buf> {
-    type Item = &'buf CStr;
+    type Item = &'buf U16CStr;
 
-    fn next(&mut self) -> Option<&'buf CStr> {
+    fn next(&mut self) -> Option<Self::Item> {
         match self.buf[self.pos..].iter().position(|&c| c == 0) {
             None | Some(0) => None,
             Some(len) => {
                 let old_pos = self.pos;
                 self.pos += len + 1;
                 // The panic can't happen, but we avoid unsafe.
-                Some(CStr::from_bytes_with_nul(&self.buf[old_pos..self.pos]).unwrap())
+                // Some(OsString::from_wide(&self.buf[old_pos..self.pos - 1]))
+                unsafe { Some(U16CStr::from_slice_unchecked(&self.buf[old_pos..self.pos])) }
             }
         }
     }
@@ -816,9 +795,9 @@ impl Context {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga93b07815789b3cf2629d439ecf20f0d9
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379793.aspx
-    pub fn list_readers<'buf>(&self, buffer: &'buf mut [u8]) -> Result<ReaderNames<'buf>, Error> {
+    pub fn list_readers<'buf>(&self, buffer: &'buf mut [u16]) -> Result<ReaderNames<'buf>, Error> {
         unsafe {
-            assert!(buffer.len() <= std::u32::MAX as usize);
+            assert!(buffer.len() <= u32::MAX as usize);
             let mut buflen = buffer.len() as DWORD;
             // SCardListReaders treats null specially, to query the needed
             // buffer length. We don't want the caller to be able to trigger
@@ -827,14 +806,14 @@ impl Context {
             let bufptr = if buflen == 0 {
                 null_mut()
             } else {
-                let ptr = buffer.as_mut_ptr() as *mut c_char;
+                let ptr = buffer.as_mut_ptr();
                 assert!(!ptr.is_null());
                 ptr
             };
 
             let err = ffi::SCardListReaders(self.inner.handle, null(), bufptr, &mut buflen);
             if err == Error::NoReadersAvailable.into_raw() {
-                return Ok(ReaderNames { buf: b"\0", pos: 0 });
+                return Ok(ReaderNames { buf: &[0u16], pos: 0 });
             }
             if err != ffi::SCARD_S_SUCCESS {
                 return Err(Error::from_raw(err));
@@ -880,13 +859,13 @@ impl Context {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga93b07815789b3cf2629d439ecf20f0d9
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379793.aspx
-    pub fn list_readers_owned(&self) -> Result<Vec<CString>, Error> {
+    pub fn list_readers_owned(&self) -> Result<Vec<U16CString>, Error> {
         let len = self.list_readers_len()?;
         if len == 0 {
             return Ok(vec![]);
         }
-        let mut buffer = vec![0u8; len];
-        Ok(self.list_readers(&mut buffer)?.map(ToOwned::to_owned).collect())
+        let mut buffer = vec![0u16; len];
+        Ok(self.list_readers(&mut buffer)?.map(|s| s.to_owned()).collect())
     }
 
     /// Connect to a card which is present in a reader.
@@ -897,11 +876,10 @@ impl Context {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#ga4e515829752e0a8dbc4d630696a8d6a5
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379473.aspx
-    pub fn connect(&self, reader: &CStr, share_mode: ShareMode, preferred_protocols: Protocols) -> Result<Card, Error> {
+    pub fn connect(&self, reader: &U16CStr, share_mode: ShareMode, preferred_protocols: Protocols) -> Result<Card, Error> {
         unsafe {
             let mut handle: ffi::SCARDHANDLE = DUMMY_LONG as ffi::SCARDHANDLE;
             let mut raw_active_protocol: DWORD = DUMMY_DWORD;
-
             try_pcsc!(ffi::SCardConnect(
                 self.inner.handle,
                 reader.as_ptr(),
@@ -955,7 +933,7 @@ impl Context {
         };
 
         unsafe {
-            assert!(readers.len() <= std::u32::MAX as usize);
+            assert!(readers.len() <= u32::MAX as usize);
 
             try_pcsc!(ffi::SCardGetStatusChange(
                 self.inner.handle,
@@ -998,7 +976,7 @@ unsafe impl Sync for Context {}
 impl ReaderState {
     /// Create a ReaderState for a card reader with a given presumed
     /// state.
-    pub fn new<T: Into<CString>>(name: T, current_state: State) -> ReaderState {
+    pub fn new<T: Into<U16CString>>(name: T, current_state: State) -> ReaderState {
         ReaderState {
             inner: ffi::SCARD_READERSTATE {
                 szReader: name.into().into_raw(),
@@ -1013,11 +991,12 @@ impl ReaderState {
     }
 
     /// The name of the card reader.
-    pub fn name(&self) -> &CStr {
+   pub fn name(&self) -> &U16CStr {
         // Lifetime elision assigns this the same lifetime as &self; this
         // is what we want, and is safe.
-        unsafe { CStr::from_ptr(self.inner.szReader) }
+        unsafe { U16CStr::from_ptr_str(self.inner.szReader) }
     }
+
 
     /// The ATR (Answer To Reset) of the card inserted to the reader.
     pub fn atr(&self) -> &[u8] {
@@ -1040,7 +1019,7 @@ impl ReaderState {
     /// reader. This can be used to detect a card removal/insertion
     /// between two calls to `Context::get_status_change()`.
     pub fn event_count(&self) -> u32 {
-        ((self.inner.dwEventState & 0xFFFF_0000) >> 16) as u32
+        (self.inner.dwEventState & 0xFFFF_0000) >> 16
     }
 
     /// Sync the currently-known state to the last reported state.
@@ -1055,7 +1034,7 @@ impl ReaderState {
 impl Drop for ReaderState {
     fn drop(&mut self) {
         // Reclaim the name and drop it immediately.
-        unsafe { drop(CString::from_raw(self.inner.szReader as *mut c_char)) };
+        unsafe { drop(U16CString::from_raw(self.inner.szReader as *mut u16)) };
     }
 }
 
@@ -1118,7 +1097,7 @@ impl<'names_buf, 'atr_buf> CardStatus<'names_buf, 'atr_buf> {
 /// This is an owned version of [`CardStatus`](struct.CardStatus.html).
 #[derive(Clone, Debug)]
 pub struct CardStatusOwned {
-    reader_names: Vec<CString>,
+    reader_names: Vec<U16CString>,
     state: DWORD,
     protocol: Option<Protocol>,
     atr: Vec<u8>,
@@ -1126,7 +1105,7 @@ pub struct CardStatusOwned {
 
 impl CardStatusOwned {
     /// Slice of the names by which the connected card reader is known.
-    pub fn reader_names(&self) -> &[CString] {
+    pub fn reader_names(&self) -> &[U16CString] {
         &self.reader_names
     }
 
@@ -1177,7 +1156,7 @@ impl Card {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gaddb835dce01a0da1d6ca02d33ee7d861
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379469.aspx
-    pub fn transaction(&mut self) -> Result<Transaction, Error> {
+    pub fn transaction(&mut self) -> Result<Transaction<'_>, Error> {
         unsafe {
             try_pcsc!(ffi::SCardBeginTransaction(self.handle,));
 
@@ -1203,7 +1182,7 @@ impl Card {
     ///
     /// [1]: https://pcsclite.apdu.fr/api/group__API.html#gaddb835dce01a0da1d6ca02d33ee7d861
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379469.aspx
-    pub fn transaction2(&mut self) -> Result<Transaction, (&mut Self, Error)> {
+    pub fn transaction2(&mut self) -> Result<Transaction<'_>, (&mut Self, Error)> {
         unsafe {
             let err = ffi::SCardBeginTransaction(self.handle);
             if err != ffi::SCARD_S_SUCCESS {
@@ -1334,20 +1313,20 @@ impl Card {
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379803.aspx
     pub fn status2<'names_buf, 'atr_buf>(
         &self,
-        names_buffer: &'names_buf mut [u8],
+        names_buffer: &'names_buf mut [u16],
         atr_buffer: &'atr_buf mut [u8],
     ) -> Result<CardStatus<'names_buf, 'atr_buf>, Error> {
         unsafe {
-            assert!(names_buffer.len() <= std::u32::MAX as usize);
+            assert!(names_buffer.len() <= u32::MAX as usize);
             let mut names_len: DWORD = names_buffer.len() as DWORD;
             let mut raw_state: DWORD = DUMMY_DWORD;
             let mut raw_protocol: DWORD = DUMMY_DWORD;
-            assert!(atr_buffer.len() <= std::u32::MAX as usize);
+            assert!(atr_buffer.len() <= u32::MAX as usize);
             let mut atr_len: DWORD = atr_buffer.len() as DWORD;
 
             try_pcsc!(ffi::SCardStatus(
                 self.handle,
-                names_buffer.as_mut_ptr() as *mut c_char,
+                names_buffer.as_mut_ptr(),
                 &mut names_len,
                 &mut raw_state,
                 &mut raw_protocol,
@@ -1405,12 +1384,12 @@ impl Card {
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379803.aspx
     pub fn status2_owned(&self) -> Result<CardStatusOwned, Error> {
         let (names_len, atr_len) = self.status2_len()?;
-        let mut names_buffer = vec![0u8; names_len];
+        let mut names_buffer = vec![0u16; names_len];
         let mut atr_buffer = vec![0u8; atr_len];
 
         let (reader_names, state, protocol, atr_len) = {
             let card_status = self.status2(&mut names_buffer, &mut atr_buffer)?;
-            let reader_names = card_status.reader_names.map(ToOwned::to_owned).collect();
+            let reader_names = card_status.reader_names.map(|s| s.to_owned()).collect();
             (
                 reader_names,
                 card_status.state,
@@ -1446,7 +1425,7 @@ impl Card {
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379559.aspx
     pub fn get_attribute<'buf>(&self, attribute: Attribute, buffer: &'buf mut [u8]) -> Result<&'buf [u8], Error> {
         unsafe {
-            assert!(buffer.len() <= std::u32::MAX as usize);
+            assert!(buffer.len() <= u32::MAX as usize);
             let mut attribute_len = buffer.len() as DWORD;
             // SCardGetAttribtreats null specially, to query the needed
             // buffer length. We don't want the caller to be able to trigger
@@ -1522,7 +1501,7 @@ impl Card {
     /// [2]: https://msdn.microsoft.com/en-us/library/aa379801.aspx
     pub fn set_attribute(&self, attribute: Attribute, attribute_data: &[u8]) -> Result<(), Error> {
         unsafe {
-            assert!(attribute_data.len() <= std::u32::MAX as usize);
+            assert!(attribute_data.len() <= u32::MAX as usize);
 
             try_pcsc!(ffi::SCardSetAttrib(
                 self.handle,
@@ -1593,11 +1572,11 @@ impl Card {
             .expect("pcsc::Card::transmit() does not work with direct connections");
         let send_pci = get_protocol_pci(active_protocol);
         let recv_pci = null_mut();
-        assert!(receive_buffer.len() <= std::u32::MAX as usize);
+        assert!(receive_buffer.len() <= u32::MAX as usize);
         let mut receive_len = receive_buffer.len() as DWORD;
 
         unsafe {
-            assert!(send_buffer.len() <= std::u32::MAX as usize);
+            assert!(send_buffer.len() <= u32::MAX as usize);
 
             let r = ffi::SCardTransmit(
                 self.handle,
@@ -1647,8 +1626,8 @@ impl Card {
         let mut receive_len: DWORD = DUMMY_DWORD;
 
         unsafe {
-            assert!(send_buffer.len() <= std::u32::MAX as usize);
-            assert!(receive_buffer.len() <= std::u32::MAX as usize);
+            assert!(send_buffer.len() <= u32::MAX as usize);
+            assert!(receive_buffer.len() <= u32::MAX as usize);
 
             try_pcsc!(ffi::SCardControl(
                 self.handle,

@@ -30,7 +30,7 @@
 // LONG is i32 they are negative (which presumably was the intention).
 #![allow(overflowing_literals)]
 
-use std::os::raw::{c_char, c_void};
+use std::os::raw::c_void;
 #[cfg(not(target_os = "macos"))]
 use std::os::raw::{c_long, c_ulong};
 
@@ -223,7 +223,7 @@ pub const ATR_BUFFER_SIZE: usize = 36;
 #[cfg_attr(not(target_os = "macos"), repr(C))]
 #[cfg_attr(target_os = "macos", repr(C, packed))]
 pub struct SCARD_READERSTATE {
-    pub szReader: *const c_char,
+    pub szReader: *const u16,
     pub pvUserData: *mut c_void,
     pub dwCurrentState: DWORD,
     pub dwEventState: DWORD,
@@ -331,10 +331,10 @@ extern "system" {
 
     pub fn SCardCancel(hContext: SCARDCONTEXT) -> LONG;
 
-    #[cfg_attr(target_os = "windows", link_name = "SCardConnectA")]
+    #[cfg_attr(target_os = "windows", link_name = "SCardConnectW")]
     pub fn SCardConnect(
         hContext: SCARDCONTEXT,
-        szReader: *const c_char,
+        szReader: *const u16,
         dwShareMode: DWORD,
         dwPreferredProtocols: DWORD,
         phCard: *mut SCARDHANDLE,
@@ -351,7 +351,7 @@ extern "system" {
 
     pub fn SCardDisconnect(hCard: SCARDHANDLE, dwDisposition: DWORD) -> LONG;
 
-    #[cfg_attr(target_os = "windows", link_name = "SCardGetStatusChangeA")]
+    #[cfg_attr(target_os = "windows", link_name = "SCardGetStatusChangeW")]
     pub fn SCardGetStatusChange(
         hContext: SCARDCONTEXT,
         dwTimeout: DWORD,
@@ -359,11 +359,11 @@ extern "system" {
         cReaders: DWORD,
     ) -> LONG;
 
-    #[cfg_attr(target_os = "windows", link_name = "SCardListReadersA")]
+    #[cfg_attr(target_os = "windows", link_name = "SCardListReadersW")]
     pub fn SCardListReaders(
         hContext: SCARDCONTEXT,
-        mszGroups: *const c_char,
-        mszReaders: *mut c_char,
+        mszGroups: *const u16,
+        mszReaders: *mut u16,
         pcchReaders: *mut DWORD,
     ) -> LONG;
 
@@ -371,10 +371,10 @@ extern "system" {
 
     pub fn SCardEndTransaction(hCard: SCARDHANDLE, dwDisposition: DWORD) -> LONG;
 
-    #[cfg_attr(target_os = "windows", link_name = "SCardStatusA")]
+    #[cfg_attr(target_os = "windows", link_name = "SCardStatusW")]
     pub fn SCardStatus(
         hCard: SCARDHANDLE,
-        szReaderName: *mut c_char,
+        szReaderName: *mut u16,
         pcchReaderLen: *mut DWORD,
         pdwState: *mut DWORD,
         pdwProtocol: *mut DWORD,

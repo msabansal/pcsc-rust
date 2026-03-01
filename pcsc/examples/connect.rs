@@ -19,7 +19,7 @@ fn main() {
     {
         // Try to connect to a card in the first reader.
         let mut card = ctx
-            .connect(readers[0], ShareMode::Shared, Protocols::ANY)
+            .connect(&readers[0], ShareMode::Shared, Protocols::ANY)
             .expect("failed to connect to card");
 
         {

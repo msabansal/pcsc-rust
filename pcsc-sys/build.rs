@@ -47,17 +47,15 @@ fn main() {
                     "cargo:rustc-link-lib={}",
                     env::var("PCSC_LIB_NAME").unwrap_or_else(|_| "pcsclite".to_string())
                 );
-            } else {
-                if let Err(err) = pkg_config::Config::new().atleast_version("1").probe("libpcsclite") {
-                    eprintln!("Could not find a PCSC library.");
-                    eprintln!(
-                        "For the target OS `{}`, I tried to use pkg-config to find libpcsclite.",
-                        target_os
-                    );
-                    eprintln!("The error given is: {}", err);
-                    print_pcsclite_error_message(&target_os);
-                    std::process::exit(1);
-                }
+            } else if let Err(err) = pkg_config::Config::new().atleast_version("1").probe("libpcsclite") {
+                eprintln!("Could not find a PCSC library.");
+                eprintln!(
+                    "For the target OS `{}`, I tried to use pkg-config to find libpcsclite.",
+                    target_os
+                );
+                eprintln!("The error given is: {}", err);
+                print_pcsclite_error_message(&target_os);
+                std::process::exit(1);
             }
         }
     };

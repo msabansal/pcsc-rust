@@ -4,7 +4,9 @@ use pcsc::*;
 fn main() {
     let ctx = Context::establish(Scope::User).expect("failed to establish context");
 
+    // let
     let mut readers_buf = [0; 2048];
+    // let name = r"\\?PnP?\Notification";
     let mut reader_states = vec![
         // Listen for reader insertions/removals, if supported.
         ReaderState::new(PNP_NOTIFICATION(), State::UNAWARE),
@@ -42,9 +44,9 @@ fn main() {
         // Print current state.
         println!();
         for rs in &reader_states {
-            if rs.name() != PNP_NOTIFICATION() {
-                println!("{:?} {:?} {:?}", rs.name(), rs.event_state(), rs.atr());
-            }
+            println!("{:?} {:?} {:?}", rs.name(), rs.event_state(), rs.atr());
+            // if rs.name() != PNP_NOTIFICATION() {
+            // }
         }
     }
 }
